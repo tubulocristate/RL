@@ -2,21 +2,23 @@ import torch
 from torch.optim import AdamW
 import numpy as np
 import gymnasium as gym
-from models import Q_NET, POLICY_NET, Q_NET_TEST
+from models import Q_NET, POLICY_NET 
 from utils import ReplayBuffer
 from copy import deepcopy
-import sys
 from tqdm import tqdm
+import sys
+import imageio
 
-env = gym.make('Pendulum-v1', g=9.81)
 def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
-        update_every, noise_clip, action_var, target_var
+        update_every, noise_clip, action_var, target_var, hidden_size,
+        n_q_nets
         ):
     assert isinstance(env.action_space, gym.spaces.Box), "TD3 only for environments with continious action space!"
     
     a_low = env.action_space.low.item()
     a_high = env.action_space.high.item()
-
+    action_dim = env.action_space.shape[0]
+    state_dim = env.observation_space.shape[0]
     def select_action(policy_net,
                       state,
                       noise_clip=noise_clip,
@@ -72,7 +74,7 @@ def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
                            for q_target in q_nets_target]
             target = torch.minimum(targets[0], targets[1])
             
-            for j in range(2):
+            for j in range(n_q_nets):
                 q_optimizers[j].zero_grad()
                 q_loss = ((q_nets[j](s, a)-target)**2).mean()
                 q_loss.backward()
@@ -87,7 +89,7 @@ def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
                 q_nets[0] = enable_grads(q_nets[0])
             
                 with torch.no_grad():
-                    for k in range(2):
+                    for k in range(n_q_nets):
                         for p, t in zip(q_nets[k].parameters(),
                                         q_nets_target[k].parameters()):
                             t.mul_(polyak)
@@ -98,10 +100,11 @@ def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
                         t.mul_(polyak)
                         t.add_((1-polyak)*p)
 
-    q_nets = [Q_NET(3, 32, 1) for _ in range(2)]
+    q_nets = [Q_NET(state_dim, hidden_size, action_dim)
+              for _ in range(n_q_nets)]
     q_nets_target = [disable_grads(deepcopy(net)) for net in q_nets]
     q_optimizers = [AdamW(net.parameters(), lr=1e-3) for net in q_nets]
-    p_net = POLICY_NET(3, 32, 1, -2, 2)
+    p_net = POLICY_NET(state_dim, hidden_size, action_dim, a_low, a_high)
     p_net_target = disable_grads(deepcopy(p_net))
     p_optimizer = AdamW(p_net.parameters(), lr=1e-3)
     
@@ -115,7 +118,7 @@ def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
     reward_per_episode = 0
     episode_duration = 0
     for t in tqdm(range(1, epochs*steps_per_epoch+1)):
-        a = select_action(p_net, torch.as_tensor(s), 0.1).numpy()
+        a = select_action(p_net, torch.as_tensor(s)).numpy()
         ns, r, te, tr, _ = env.step(a)
         d = te or tr
         replay_buffer.push(s, a, r, ns, d)
@@ -145,9 +148,7 @@ def TD3(env, epochs, steps_per_epoch, gamma, polyak, batch_size,
                     if d1 or d2:
                         test_state, _ = test_env.reset()
             test_env.close()
-            rewards_per_epoch = []
-            durations = []
-
+env = gym.make('Pendulum-v1', g=9.81)
 TD3(env, epochs=20, steps_per_epoch=4000, gamma=0.99, polyak=0.995,
     batch_size=64, update_every=50, noise_clip=0.5, action_var=0.2,
-    target_var=0.1)
+    target_var=0.1, hidden_size=32, n_q_nets=2)
