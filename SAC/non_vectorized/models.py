@@ -7,9 +7,11 @@ class Q_Network(torch.nn.Module):
         super().__init__()
         self.MLP = torch.nn.Sequential(
                 torch.nn.Linear(state_dim+action_dim, hidden_dim),
-                torch.nn.Tanh(),
+                torch.nn.ReLU(),
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.Tanh(),
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.ReLU(),
                 torch.nn.Linear(hidden_dim, 1),
                 )
 
@@ -25,12 +27,14 @@ class Policy_Network(torch.nn.Module):
         super().__init__()
         self.shared_net = torch.nn.Sequential(
                 torch.nn.Linear(state_dim, hidden_dim),
-                torch.nn.Tanh(),
+                torch.nn.ReLU(),
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.Tanh(),
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.Tanh()
                 )
-        self.mean_layer = torch.nn.Linear(hidden_dim, 1)
-        self.std_layer = torch.nn.Linear(hidden_dim, 1)
+        self.mean_layer = torch.nn.Linear(hidden_dim, action_dim)
+        self.std_layer = torch.nn.Linear(hidden_dim, action_dim)
 
     def forward(self, state):
         shared_output = self.shared_net(state)

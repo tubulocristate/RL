@@ -2,12 +2,12 @@ import torch
 import numpy as np
 
 class ReplayBuffer:
-    def __init__(self, state_dim, max_size):
+    def __init__(self, state_dim, action_dim, max_size):
         self.b_s = np.zeros((max_size, state_dim), dtype=np.float32)
-        self.b_a = np.zeros((max_size), dtype=np.float32)
-        self.b_r = np.zeros((max_size), dtype=np.float32)
+        self.b_a = np.zeros((max_size, action_dim), dtype=np.float32)
+        self.b_r = np.zeros((max_size, 1), dtype=np.float32)
         self.b_ns = np.zeros((max_size, state_dim), dtype=np.float32)
-        self.b_t = np.zeros((max_size), dtype=np.float32)
+        self.b_t = np.zeros((max_size, 1), dtype=np.float32)
         self.ptr, self.max_size = 0, max_size
 
     def push(self, s, a, r, ns, t):
@@ -26,7 +26,7 @@ class ReplayBuffer:
         batch_r = self.b_r[indexes]
         batch_ns = self.b_ns[indexes]
         batch_t = self.b_t[indexes]
-        batch = dict(state=batch_s, action=batch_a, reward=batch_r,
-                     next_state=batch_ns, terminal=batch_t)
+        batch = dict(s=batch_s, a=batch_a, r=batch_r,
+                     ns=batch_ns, t=batch_t)
         return {k : torch.tensor(v) for k, v in batch.items()}
 
