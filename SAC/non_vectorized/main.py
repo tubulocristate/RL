@@ -56,16 +56,16 @@ def update():
         for q_net in q_nets:
             disable_grads(q_net)
 
-        action = p_net.act(ns, rsample=True)
+        action = p_net.act(s, rsample=True)
         for j in range(n_q_nets):
-            values = [q_net(ns, action) for q_net in q_nets]
+            values = [q_net(s, action) for q_net in q_nets]
 
         for q_net in q_nets:
             enable_grads(q_net)
 
         min_value = torch.minimum(*values)
         p_optimizer.zero_grad()
-        loss = -(min_value - alpha*p_net.get_log_probs(ns, action)).mean()
+        loss = -(min_value - alpha*p_net.get_log_probs(s, action)).mean()
         loss.backward()
         p_optimizer.step()
                 
